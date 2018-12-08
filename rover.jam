@@ -54,7 +54,7 @@ Plan: {
     WHILE: TEST (<= $x $MAX_X){
         ASSIGN $y (+ $y $velocity);
         PERFORM MoveTo $x $y;
-        PERFORM CheckAndStore;
+        PERFORM CheckAndStore $x $y;
         WHEN: TEST (|| (== $y $MAX_Y) (== $y 0)){
           ASSIGN $x (+ $x 1);
           ASSIGN $velocity (* $velocity -1);
@@ -117,11 +117,13 @@ Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM CheckAndStore;
+  	PERFORM CheckAndStore $x $y;
   BODY:
-    ASSIGN $waterIsFound "False";
-    PERFORM CheckIfRockAround $waterIsFound;
-    EXECUTE print " " $waterIsFound "\n";
+    WHEN: TEST (FACT ROCK $x $y "True"){
+      EXECUTE print "\nFound rock with water - will take it to base\n";
+      RETRACT ROCK $x $y "True"; // delete
+    };
+
 }
 // CheckAndRemember
 Plan: {
@@ -140,22 +142,18 @@ Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM CheckIfRockAround $waterIsFound;
+  	PERFORM CheckIfRockAround $rockIsFound $x $y;
   BODY:
     ASSIGN $i 0;
-    RETRIEVEALL $rocks ROCK $X $Y $hasWater;
-    RETRIEVE CURR_POS $x $y;
+    RETRIEVEALL $rocks ROCK $X $Y;
 
     WHILE: TEST (< $i 5){
-      NEXTFACT $rocks ROCK $X $Y $hasWater;
-      WHEN: TEST (&& (== $x $X) (== $y $Y) (== $hasWater "True")){
-        ASSIGN $waterIsFound "True";
+      NEXTFACT $rocks ROCK $X $Y;
+      WHEN: TEST (&& (== $x $X) (== $y $Y)){
+        ASSIGN $rockIsFound "True";
       };
       ASSIGN $i (+ $i 1);
     };
-    // WHEN: TESTS (== $waterIsFound "False"){
-    //   FAIL;
-    // };
 }
 // AnalyzeRock
 Plan: {
