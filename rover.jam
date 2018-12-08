@@ -31,6 +31,9 @@ Plan: {
   	ACHIEVE FindAllWaterSources;
   BODY:
       PERFORM ExploratoryRoutine;
+      // WAIT ExploratoryRoutine;
+      EXECUTE print "ExploratoryRoutine is done";
+
 }
 
 // ExploratoryRoutine
@@ -50,14 +53,17 @@ Plan: {
 
     WHILE: TEST (<= $x $MAX_X){
         ASSIGN $y (+ $y $velocity);
-        PERFORM MovedTo $x $y;
+        PERFORM MoveTo $x $y;
+        PERFORM CheckAndStore;
         WHEN: TEST (|| (== $y $MAX_Y) (== $y 0)){
           ASSIGN $x (+ $x 1);
           ASSIGN $velocity (* $velocity -1);
         };
     };
+
+
   EFFECTS:
-    EXECUTE print "ExploratoryRoutine is done";
+    EXECUTE print "succeeded";
 }
 
 // RetrieveKnownRockRoutine
@@ -113,9 +119,9 @@ Plan: {
   GOAL:
   	PERFORM CheckAndStore;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+    ASSIGN $waterIsFound "False";
+    PERFORM CheckIfRockAround $waterIsFound;
+    EXECUTE print " " $waterIsFound "\n";
 }
 // CheckAndRemember
 Plan: {
@@ -134,11 +140,22 @@ Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM CheckIfRockAround;
+  	PERFORM CheckIfRockAround $waterIsFound;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+    ASSIGN $i 0;
+    RETRIEVEALL $rocks ROCK $X $Y $hasWater;
+    RETRIEVE CURR_POS $x $y;
+
+    WHILE: TEST (< $i 5){
+      NEXTFACT $rocks ROCK $X $Y $hasWater;
+      WHEN: TEST (&& (== $x $X) (== $y $Y) (== $hasWater "True")){
+        ASSIGN $waterIsFound "True";
+      };
+      ASSIGN $i (+ $i 1);
+    };
+    // WHEN: TESTS (== $waterIsFound "False"){
+    //   FAIL;
+    // };
 }
 // AnalyzeRock
 Plan: {
@@ -151,12 +168,14 @@ Plan: {
     EXECUTE print $foo "\n";
     ASSIGN $foo (+ $foo "!!!");
 }
-// MovedTo X,Y
+// MoveTo X,Y
 Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM MovedTo $x $y;
+  	PERFORM MoveTo $x $y;
   BODY:
     EXECUTE print "X: " $x " Y: " $y " | ";
+    UPDATE (CURR_POS) (CURR_POS $x $y);
+
 }
