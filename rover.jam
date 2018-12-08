@@ -1,13 +1,6 @@
 
 GOALS:
   ACHIEVE FindAllWaterSources;
-// OBSERVER:
-// {
-//   RETRIEVE mood $VALUE;
-//   WHEN : TEST (== $VALUE "False") {
-//       UPDATE (initialized) (initialized "True");
-//   };
-// };
 FACTS:
   FACT MAX_XY 7 6;
 
@@ -17,12 +10,21 @@ FACTS:
   FACT ROCK 3 2 "False";
   FACT ROCK 2 6 "False";
 
+  FACT EXPLORATORY_MODE "ON";
+  FACT MOVING_HOME_MODE "OFF";
+  FACT FETCH_MODE "OFF";
+
   FACT KNOWN_ROCK_POSITIONS;
-  FACT COMPARTMENT_FULL "False";
-  FACT RETURN_TO_POS;
+  FACT EXPLOR_START_POS 0 0;
   FACT CURR_POS 0 0;
   FACT VELOCITY 1;
 
+// OBSERVER {
+//   RETRIEVE EXPLORATORY_MODE $VALUE;
+//   // WHEN : TEST (== $VALUE "True") {
+//   //     UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "False");
+//   // };
+// };
 // Find water source
 Plan: {
   NAME:
@@ -30,7 +32,9 @@ Plan: {
   GOAL:
   	ACHIEVE FindAllWaterSources;
   BODY:
-      PERFORM ExploratoryRoutine;
+      WHEN: TEST(FACT EXPLORATORY_MODE "False"){
+        PERFORM ExploratoryRoutine;
+      };
       // WAIT ExploratoryRoutine;
       EXECUTE print "ExploratoryRoutine is done";
 
@@ -43,27 +47,28 @@ Plan: {
   GOAL:
   	PERFORM ExploratoryRoutine;
   CONTEXT:
-    // RETRIEVE COMPARTMENT_FULL $compartment_full;
-    // (== compartment_full "False")
-    FACT COMPARTMENT_FULL "False";
+    FACT EXPLORATORY_MODE "ON";
   BODY:
     RETRIEVE CURR_POS $x $y;
     RETRIEVE MAX_XY $MAX_X $MAX_Y;
     RETRIEVE VELOCITY $velocity;
+
+    WHEN: TEST (== (FACT EXPLOR_START_POS $x $y) (== "True" "False")) {
+      EXECUTE print "lol";
+    };
 
     WHILE: TEST (<= $x $MAX_X){
         ASSIGN $y (+ $y $velocity);
         PERFORM MoveTo $x $y;
         PERFORM CheckAndStore $x $y;
         WHEN: TEST (|| (== $y $MAX_Y) (== $y 0)){
+          SUCCEED;
           ASSIGN $x (+ $x 1);
           ASSIGN $velocity (* $velocity -1);
         };
     };
-
-
   EFFECTS:
-    EXECUTE print "succeeded";
+    EXECUTE print "\nMISSION COMPLETE!";
 }
 
 // RetrieveKnownRockRoutine
@@ -105,11 +110,14 @@ Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM GetHomeExploring;
+  	PERFORM GetHomeExploring $x $y;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+    WHILE: TEST (>= $y 0){
+      ASSIGN $y (- $y 1); // intend to move down
+      PERFORM MoveTo $x $y;
+      PERFORM CheckAndRemember $x $y;
+    };
+
 }
 
 // CheckAndStore
@@ -122,6 +130,12 @@ Plan: {
     WHEN: TEST (FACT ROCK $x $y "True"){
       EXECUTE print "\nFound rock with water - will take it to base\n";
       RETRACT ROCK $x $y "True"; // delete
+      WHEN: TEST (&& (FACT VELOCITY -1) (> $y 0)){
+        PERFORM GetHomeExploring $x $y;
+      };
+      UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "True");
+      UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "True");
+      UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "True");
     };
 
 }
