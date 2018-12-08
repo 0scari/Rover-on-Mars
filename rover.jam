@@ -1,0 +1,154 @@
+
+GOALS:
+  PERFORM FindWaterSource;
+// OBSERVER:
+// {
+//   RETRIEVE mood $VALUE;
+//   WHEN : TEST (== $VALUE "False") {
+//       UPDATE (initialized) (initialized "True");
+//   };
+// };
+FACTS:
+  FACT MAX_X 7;
+  FACT MAX_Y 6;
+
+  FACT ROCK 7 5 "True";
+  FACT ROCK 6 1 "False";
+  FACT ROCK 5 3 "False";
+  FACT ROCK 3 2 "False";
+  FACT ROCK 2 6 "False";
+
+  FACT KNOWN_ROCK_POSITIONS;
+  FACT COMPARTMENT_FULL "False";
+  FACT RETURN_TO_POS;
+  FACT CURR_COORDS 0 0;
+  FACT Y_VEL 1;
+
+
+// Find water source
+Plan: {
+  NAME:
+  	"Find Water Source"
+  GOAL:
+  	PERFORM FindWaterSource;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+    PERFORM Hello1;
+}
+
+// ExploratoryRoutine
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM ExploratoryRoutine;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+
+// RetrieveKnownRockRoutine
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM ExploratoryRoutine;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+
+// GetHomeRoutine
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM GetHomeRoutine;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+// GetHomeDirectly
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM GetHomeDirectly;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+// GetHomeExploring
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM GetHomeExploring;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+
+// CheckAndStore
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM CheckAndStore;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+// CheckAndRemember
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM CheckAndRemember;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+
+// CheckIfRockAround
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM CheckIfRockAround;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+// AnalyzeRock
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM AnalyzeRock;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
+// MoveTo X,Y
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM MoveTo $x $y;
+  BODY:
+    RETRIEVE initialized $foo;
+    EXECUTE print $foo "\n";
+    ASSIGN $foo (+ $foo "!!!");
+}
