@@ -1,6 +1,6 @@
 
 GOALS:
-  PERFORM FindWaterSource;
+  ACHIEVE FindAllWaterSources;
 // OBSERVER:
 // {
 //   RETRIEVE mood $VALUE;
@@ -9,8 +9,7 @@ GOALS:
 //   };
 // };
 FACTS:
-  FACT MAX_X 7;
-  FACT MAX_Y 6;
+  FACT MAX_XY 7 6;
 
   FACT ROCK 7 5 "True";
   FACT ROCK 6 1 "False";
@@ -21,21 +20,17 @@ FACTS:
   FACT KNOWN_ROCK_POSITIONS;
   FACT COMPARTMENT_FULL "False";
   FACT RETURN_TO_POS;
-  FACT CURR_COORDS 0 0;
-  FACT Y_VEL 1;
-
+  FACT CURR_POS 0 0;
+  FACT VELOCITY 1;
 
 // Find water source
 Plan: {
   NAME:
   	"Find Water Source"
   GOAL:
-  	PERFORM FindWaterSource;
+  	ACHIEVE FindAllWaterSources;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
-    PERFORM Hello1;
+      PERFORM ExploratoryRoutine;
 }
 
 // ExploratoryRoutine
@@ -44,10 +39,25 @@ Plan: {
   	""
   GOAL:
   	PERFORM ExploratoryRoutine;
+  CONTEXT:
+    // RETRIEVE COMPARTMENT_FULL $compartment_full;
+    // (== compartment_full "False")
+    FACT COMPARTMENT_FULL "False";
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+    RETRIEVE CURR_POS $x $y;
+    RETRIEVE MAX_XY $MAX_X $MAX_Y;
+    RETRIEVE VELOCITY $velocity;
+
+    WHILE: TEST (<= $x $MAX_X){
+        ASSIGN $y (+ $y $velocity);
+        PERFORM MovedTo $x $y;
+        WHEN: TEST (|| (== $y $MAX_Y) (== $y 0)){
+          ASSIGN $x (+ $x 1);
+          ASSIGN $velocity (* $velocity -1);
+        };
+    };
+  EFFECTS:
+    EXECUTE print "ExploratoryRoutine is done";
 }
 
 // RetrieveKnownRockRoutine
@@ -55,7 +65,7 @@ Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM ExploratoryRoutine;
+  	PERFORM RetrieveKnownRockRoutine;
   BODY:
     RETRIEVE initialized $foo;
     EXECUTE print $foo "\n";
@@ -141,14 +151,12 @@ Plan: {
     EXECUTE print $foo "\n";
     ASSIGN $foo (+ $foo "!!!");
 }
-// MoveTo X,Y
+// MovedTo X,Y
 Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM MoveTo $x $y;
+  	PERFORM MovedTo $x $y;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+    EXECUTE print "X: " $x " Y: " $y " | ";
 }
