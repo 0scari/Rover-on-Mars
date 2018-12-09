@@ -14,17 +14,11 @@ FACTS:
   FACT MOVING_HOME_MODE "OFF";
   FACT FETCH_MODE "OFF";
 
-  FACT KNOWN_ROCK_POSITIONS;
+  FACT KNOWN_ROCK_LOC;
   FACT EXPLOR_START_POS 0 0;
   FACT CURR_POS 0 0;
-  FACT VELOCITY 1;
+  FACT EXPL_VELOCITY 1;
 
-// OBSERVER {
-//   RETRIEVE EXPLORATORY_MODE $VALUE;
-//   // WHEN : TEST (== $VALUE "True") {
-//   //     UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "False");
-//   // };
-// };
 // Find water source
 Plan: {
   NAME:
@@ -32,11 +26,12 @@ Plan: {
   GOAL:
   	ACHIEVE FindAllWaterSources;
   BODY:
-      WHEN: TEST(FACT EXPLORATORY_MODE "False"){
+      WHEN: TEST(FACT EXPLORATORY_MODE "ON"){
         PERFORM ExploratoryRoutine;
       };
-      // WAIT ExploratoryRoutine;
-      EXECUTE print "ExploratoryRoutine is done";
+      WHEN: TEST(FACT MOVING_HOME_MODE "ON"){
+        ACHIEVE MovedTo 0 0 "Base";
+      };
 
 }
 
@@ -51,22 +46,24 @@ Plan: {
   BODY:
     RETRIEVE CURR_POS $x $y;
     RETRIEVE MAX_XY $MAX_X $MAX_Y;
-    RETRIEVE VELOCITY $velocity;
+    RETRIEVE EXPL_VELOCITY $velocity;
+    RETRIEVE EXPLOR_START_POS $sX $sY;
 
-    WHEN: TEST (== (FACT EXPLOR_START_POS $x $y) (== "True" "False")) {
-      EXECUTE print "lol";
-    };
-
-    WHILE: TEST (<= $x $MAX_X){
+      WHEN: TEST (|| (!= $x $sX) (!= $y $sY)){
+        ACHIEVE MovedTo $sX $sY;
+      };
+      WHILE: TEST (<= $x $MAX_X){
         ASSIGN $y (+ $y $velocity);
         PERFORM MoveTo $x $y;
         PERFORM CheckAndStore $x $y;
         WHEN: TEST (|| (== $y $MAX_Y) (== $y 0)){
-          SUCCEED;
-          ASSIGN $x (+ $x 1);
+          ASSIGN $x (+ $x 1); // move to next x axis
+          PERFORM MoveTo $x $y;
+          PERFORM CheckAndStore $x $y;
           ASSIGN $velocity (* $velocity -1);
         };
-    };
+      };
+
   EFFECTS:
     EXECUTE print "\nMISSION COMPLETE!";
 }
@@ -81,6 +78,39 @@ Plan: {
     RETRIEVE initialized $foo;
     EXECUTE print $foo "\n";
     ASSIGN $foo (+ $foo "!!!");
+}
+
+// MovedTo
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	ACHIEVE MovedTo $X $Y $destName;
+  BODY:
+    RETRIEVE CURR_POS $x $y;
+
+    AND
+    {
+      ASSIGN $velocity 1;
+      WHEN: TEST (< $X $x) {
+        ASSIGN $velocity -1;
+      };
+      WHILE: TEST (!= $X $x){
+        ASSIGN $x (+ $x $velocity);
+        PERFORM MoveTo $x $y;
+      };
+    }{
+      ASSIGN $velocity 1;
+      WHEN: TEST (< $Y $y) {
+        ASSIGN $velocity -1;
+      };
+      WHILE: TEST (!= $Y $y){
+        ASSIGN $y (+ $y $velocity);
+        PERFORM MoveTo $x $y;
+      };
+    };
+  EFFECTS:
+    EXECUTE print "\nArrived: " $destName;
 }
 
 // GetHomeRoutine
@@ -127,28 +157,35 @@ Plan: {
   GOAL:
   	PERFORM CheckAndStore $x $y;
   BODY:
-    WHEN: TEST (FACT ROCK $x $y "True"){
+    OR{
+      TEST (FACT ROCK $x $y "True");
       EXECUTE print "\nFound rock with water - will take it to base\n";
       RETRACT ROCK $x $y "True"; // delete
-      WHEN: TEST (&& (FACT VELOCITY -1) (> $y 0)){
+      WHEN: TEST (&& (FACT EXPL_VELOCITY -1) (> $y 0)){ // When was exploring downwards
         PERFORM GetHomeExploring $x $y;
       };
-      UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "True");
-      UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "True");
-      UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "True");
+      UPDATE (EXPLORATORY_MODE) (MOVING_HOME_MODE "ON");
+      UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "OFF");
+    }{
+      TEST (FACT ROCK $x $y "False");
+      EXECUTE print "\nFound rock with no water - discarding it\n";
+      RETRACT ROCK $x $y "False"; // delete
+    }{
+      SUCCEED;
     };
-
 }
 // CheckAndRemember
 Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM CheckAndRemember;
+  	PERFORM CheckAndRemember $x $y;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+  WHEN: TEST (FACT ROCK $x $y){
+    EXECUTE print "\nFound another rock, saving its location\n";
+    ASSERT KNOWN_ROCK_LOC $x $y;
+  };
+
 }
 
 // CheckIfRockAround
@@ -187,7 +224,6 @@ Plan: {
   GOAL:
   	PERFORM MoveTo $x $y;
   BODY:
-    EXECUTE print "X: " $x " Y: " $y " | ";
     UPDATE (CURR_POS) (CURR_POS $x $y);
-
+    EXECUTE print "-> X: " $x " Y: " $y " | ";
 }
