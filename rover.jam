@@ -4,20 +4,26 @@ GOALS:
 FACTS:
   FACT MAX_XY 7 6;
 
-  FACT ROCK 7 5 "True";
+  FACT ROCK 2 6 "False";
+  FACT ROCK 3 1 "False";
   FACT ROCK 6 1 "False";
   FACT ROCK 5 3 "False";
-  FACT ROCK 3 2 "False";
-  FACT ROCK 2 6 "False";
+  FACT ROCK 7 5 "True";
+  FACT ROCK 3 2 "True";
+  FACT ROCK 2 2 "True";
+  FACT ROCK 3 3 "True";
 
   FACT EXPLORATORY_MODE "ON";
   FACT MOVING_HOME_MODE "OFF";
   FACT FETCH_MODE "OFF";
 
-  FACT KNOWN_ROCK_LOC;
   FACT EXPLOR_START_POS 0 0;
   FACT CURR_POS 0 0;
   FACT EXPL_VELOCITY 1;
+
+  FACT TOTAL_MOVES 0;
+  FACT WATER_FOUND "";
+  FACT EMPTY_ROCK_FOUND "";
 
 // Find water source
 Plan: {
@@ -26,13 +32,39 @@ Plan: {
   GOAL:
   	ACHIEVE FindAllWaterSources;
   BODY:
-      WHEN: TEST(FACT EXPLORATORY_MODE "ON"){
-        PERFORM ExploratoryRoutine;
+      OR {
+        TEST(FACT MOVING_HOME_MODE "ON");
+        PERFORM MovedTo 0 0 "in base\n";
+        UPDATE (MOVING_HOME_MODE) (MOVING_HOME_MODE "OFF");
+        RETRIEVEALL $knowns KNOWN_ROCK_LOC $x $y;
+        NEXTFACT $knowns KNOWN_ROCK_LOC $x $y;
+        UPDATE (FETCH_MODE) (FETCH_MODE "ON");
+        FAIL;
+      }{
+        TEST(FACT FETCH_MODE "ON");
+        PERFORM FetchKnownRockRoutine;
+        FAIL;
+      }{
+        RETRIEVE EXPLOR_START_POS $sX $sY;
+        OR {
+          RETRIEVE MAX_XY $MAX_X $MAX_Y;
+          OR {
+            TEST (== (% $MAX_X 2) 0);
+            TEST (&& (== $sX $MAX_X) (== $sY $MAX_Y));
+          }{
+            TEST (!= (% $MAX_X 2) 0);
+            TEST (&& (== $sX $MAX_X) (== $sY 0));
+          };
+        }{
+          RETRIEVE CURR_POS $x $y;
+          WHEN: TEST (|| (!= $x $sX) (!= $y $sY)){
+            PERFORM MovedTo $sX $sY "at the exploaration point\n";
+          };
+          UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "ON");
+          ACHIEVE ExploratoryRoutine;
+        };
       };
-      WHEN: TEST(FACT MOVING_HOME_MODE "ON"){
-        ACHIEVE MovedTo 0 0 "Base";
-      };
-
+      PERFORM PrintStats;
 }
 
 // ExploratoryRoutine
@@ -40,44 +72,48 @@ Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM ExploratoryRoutine;
+  	ACHIEVE ExploratoryRoutine $x $y;
   CONTEXT:
     FACT EXPLORATORY_MODE "ON";
   BODY:
-    RETRIEVE CURR_POS $x $y;
     RETRIEVE MAX_XY $MAX_X $MAX_Y;
     RETRIEVE EXPL_VELOCITY $velocity;
-    RETRIEVE EXPLOR_START_POS $sX $sY;
-
-      WHEN: TEST (|| (!= $x $sX) (!= $y $sY)){
-        ACHIEVE MovedTo $sX $sY;
-      };
-      WHILE: TEST (<= $x $MAX_X){
-        ASSIGN $y (+ $y $velocity);
+    RETRIEVE CURR_POS $x $y;
+    WHILE: TEST (|| (!= $x $MAX_X) (!= $y $MAX_Y)){
+      ASSIGN $y (+ $y $velocity);
+      PERFORM MoveTo $x $y;
+      PERFORM CheckAndStore $x $y;
+      WHEN: TEST (&& (|| (== $y $MAX_Y) (== $y 0)) (< $x $MAX_X)) {
+        ASSIGN $x (+ $x 1); // move to next x axis
         PERFORM MoveTo $x $y;
         PERFORM CheckAndStore $x $y;
-        WHEN: TEST (|| (== $y $MAX_Y) (== $y 0)){
-          ASSIGN $x (+ $x 1); // move to next x axis
-          PERFORM MoveTo $x $y;
-          PERFORM CheckAndStore $x $y;
-          ASSIGN $velocity (* $velocity -1);
-        };
+        ASSIGN $velocity (* $velocity -1);
+        UPDATE (EXPL_VELOCITY) (EXPL_VELOCITY $velocity);
       };
-
-  EFFECTS:
-    EXECUTE print "\nMISSION COMPLETE!";
+    };
+  FAILURE:
+    WHEN: TEST (&& (== $y $MAX_Y) (== $velocity 1)){
+      UPDATE (EXPL_VELOCITY) (EXPL_VELOCITY -1);
+    };
+    WHEN: TEST (&& (== $y 0) (== $velocity -1)){
+      UPDATE (EXPL_VELOCITY) (EXPL_VELOCITY 1);
+    };
 }
 
-// RetrieveKnownRockRoutine
+// FetchKnownRockRoutine
 Plan: {
   NAME:
   	""
   GOAL:
-  	PERFORM RetrieveKnownRockRoutine;
+  	PERFORM FetchKnownRockRoutine;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+    RETRIEVEALL $knowns KNOWN_ROCK_LOC $x $y;
+    NEXTFACT $knowns KNOWN_ROCK_LOC $x $y;
+    EXECUTE print "\nReturning to a known rock\n";
+    PERFORM MovedTo $x $y "at a known rock location\n";
+    RETRACT KNOWN_ROCK_LOC $x $y;
+    PERFORM CheckAndStore $x $y;
+    UPDATE (FETCH_MODE) (FETCH_MODE "OFF");
 }
 
 // MovedTo
@@ -85,10 +121,9 @@ Plan: {
   NAME:
   	""
   GOAL:
-  	ACHIEVE MovedTo $X $Y $destName;
+  	PERFORM MovedTo $X $Y $destName;
   BODY:
     RETRIEVE CURR_POS $x $y;
-
     AND
     {
       ASSIGN $velocity 1;
@@ -110,7 +145,7 @@ Plan: {
       };
     };
   EFFECTS:
-    EXECUTE print "\nArrived: " $destName;
+    EXECUTE print "\nArrived " $destName;
 }
 
 // GetHomeRoutine
@@ -120,20 +155,7 @@ Plan: {
   GOAL:
   	PERFORM GetHomeRoutine;
   BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
-}
-// GetHomeDirectly
-Plan: {
-  NAME:
-  	""
-  GOAL:
-  	PERFORM GetHomeDirectly;
-  BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
+
 }
 // GetHomeExploring
 Plan: {
@@ -142,12 +164,12 @@ Plan: {
   GOAL:
   	PERFORM GetHomeExploring $x $y;
   BODY:
-    WHILE: TEST (>= $y 0){
+    WHILE: TEST (> $y 0){
       ASSIGN $y (- $y 1); // intend to move down
       PERFORM MoveTo $x $y;
       PERFORM CheckAndRemember $x $y;
     };
-
+    UPDATE (EXPLOR_START_POS) (EXPLOR_START_POS $x $y);
 }
 
 // CheckAndStore
@@ -159,16 +181,21 @@ Plan: {
   BODY:
     OR{
       TEST (FACT ROCK $x $y "True");
+      RETRIEVE WATER_FOUND $wf;
+      UPDATE (WATER_FOUND) (WATER_FOUND (+ $wf (+ "\nRock with water at: " (+ (+ $x " | ") $y))));
       EXECUTE print "\nFound rock with water - will take it to base\n";
       RETRACT ROCK $x $y "True"; // delete
       WHEN: TEST (&& (FACT EXPL_VELOCITY -1) (> $y 0)){ // When was exploring downwards
         PERFORM GetHomeExploring $x $y;
       };
-      UPDATE (EXPLORATORY_MODE) (MOVING_HOME_MODE "ON");
+      UPDATE (MOVING_HOME_MODE) (MOVING_HOME_MODE "ON");
+      UPDATE (EXPLOR_START_POS) (EXPLOR_START_POS $x $y);
       UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "OFF");
     }{
       TEST (FACT ROCK $x $y "False");
       EXECUTE print "\nFound rock with no water - discarding it\n";
+      RETRIEVE EMPTY_ROCK_FOUND $str;
+      UPDATE (EMPTY_ROCK_FOUND) (EMPTY_ROCK_FOUND (+ $str (+ "\nRock with no water at: " (+ (+ $x " | ") $y))));
       RETRACT ROCK $x $y "False"; // delete
     }{
       SUCCEED;
@@ -181,13 +208,27 @@ Plan: {
   GOAL:
   	PERFORM CheckAndRemember $x $y;
   BODY:
-  WHEN: TEST (FACT ROCK $x $y){
-    EXECUTE print "\nFound another rock, saving its location\n";
-    ASSERT KNOWN_ROCK_LOC $x $y;
-  };
+    WHEN: TEST (FACT ROCK $x $y){
+      EXECUTE print "\nFound another rock, saving its location\n";
+      ASSERT KNOWN_ROCK_LOC $x $y;
+    };
+}
+// PrintStats
+Plan: {
+  NAME:
+  	""
+  GOAL:
+  	PERFORM PrintStats ;
+  BODY:
+    RETRIEVE WATER_FOUND $water ;
+    RETRIEVE EMPTY_ROCK_FOUND $noWater;
+    RETRIEVE TOTAL_MOVES $n;
+    EXECUTE print "\n\nMISSION COMPLETE!";
+    EXECUTE print "\nTotal moves were made: " $n "\n";
+    EXECUTE print $noWater "\n";
+    EXECUTE print $water "\n";
 
 }
-
 // CheckIfRockAround
 Plan: {
   NAME:
@@ -224,6 +265,8 @@ Plan: {
   GOAL:
   	PERFORM MoveTo $x $y;
   BODY:
+    RETRIEVE TOTAL_MOVES $n;
+    UPDATE (TOTAL_MOVES) (TOTAL_MOVES (+ $n 1));
     UPDATE (CURR_POS) (CURR_POS $x $y);
-    EXECUTE print "-> X: " $x " Y: " $y " | ";
+    EXECUTE print "\n-> X: " $x " Y: " $y " | ";
 }
