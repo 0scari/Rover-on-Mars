@@ -1,8 +1,8 @@
 
 GOALS:
-  ACHIEVE FindAllWaterSources;
+  ACHIEVE TraverseArea;
 FACTS:
-  FACT MAX_XY 7 6;
+  FACT MAX_XY 7 6; // AREA BOUNDARIES
 
   FACT ROCK 2 6 "False";
   FACT ROCK 3 1 "False";
@@ -17,10 +17,11 @@ FACTS:
   FACT MOVING_HOME_MODE "OFF";
   FACT FETCH_MODE "OFF";
 
-  FACT EXPLOR_START_POS 0 0;
+  FACT EXPLOR_RES_POS 0 0; // WHERE TO RESUME EXPLORUNG
   FACT CURR_POS 0 0;
-  FACT EXPL_VELOCITY 1;
+  FACT EXPL_VELOCITY 1; // WHICH Y DIRECTION TO MOVE TO
 
+  // --- STATS ----
   FACT TOTAL_MOVES 0;
   FACT WATER_FOUND "";
   FACT EMPTY_ROCK_FOUND "";
@@ -30,7 +31,7 @@ Plan: {
   NAME:
   	"Find Water Source"
   GOAL:
-  	ACHIEVE FindAllWaterSources;
+  	ACHIEVE TraverseArea;
   BODY:
       OR {
         TEST(FACT MOVING_HOME_MODE "ON");
@@ -38,26 +39,31 @@ Plan: {
         UPDATE (MOVING_HOME_MODE) (MOVING_HOME_MODE "OFF");
         RETRIEVEALL $knowns KNOWN_ROCK_LOC $x $y;
         NEXTFACT $knowns KNOWN_ROCK_LOC $x $y;
-        UPDATE (FETCH_MODE) (FETCH_MODE "ON");
+        // EXECUTION WILL GET HERE ONLY IF KNOWN ROCKS EXIST
+        UPDATE (FETCH_MODE) (FETCH_MODE "ON"); // IF EXIST, FETCH THEM
         FAIL;
       }{
         TEST(FACT FETCH_MODE "ON");
         PERFORM FetchKnownRockRoutine;
         FAIL;
       }{
-        RETRIEVE EXPLOR_START_POS $sX $sY;
+        // IF FETCH AND RETURN HOME MODES ARE OFF, THEN EXPLORE
+        RETRIEVE EXPLOR_RES_POS $sX $sY;
+        // THE GOAL WILL BE ACHIEVED IF EITHER BRANCH HOLDS TRUE
         OR {
+          // -> IF POSITION WHERE TO RESUME EXPLORING MATCHES BOUDARY POSITION
           RETRIEVE MAX_XY $MAX_X $MAX_Y;
           OR {
-            TEST (== (% $MAX_X 2) 0);
+            TEST (== (% $MAX_X 2) 0); // ODD X AXIS NUMBER
             TEST (&& (== $sX $MAX_X) (== $sY $MAX_Y));
           }{
-            TEST (!= (% $MAX_X 2) 0);
+            TEST (!= (% $MAX_X 2) 0); // EVEN X AXIS NUMBER
             TEST (&& (== $sX $MAX_X) (== $sY 0));
           };
         }{
           RETRIEVE CURR_POS $x $y;
           WHEN: TEST (|| (!= $x $sX) (!= $y $sY)){
+            // RETURN TO POSITION WHERE EXPLORING WAS STOOPED
             PERFORM MovedTo $sX $sY "at the exploaration point\n";
           };
           UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "ON");
@@ -70,7 +76,7 @@ Plan: {
 // ExploratoryRoutine
 Plan: {
   NAME:
-  	""
+  	"Exploartory Routine"
   GOAL:
   	ACHIEVE ExploratoryRoutine $x $y;
   CONTEXT:
@@ -83,15 +89,18 @@ Plan: {
       ASSIGN $y (+ $y $velocity);
       PERFORM MoveTo $x $y;
       PERFORM CheckAndStore $x $y;
+      // WHEN FINAL POINT ON AN Y AXIS IS REACHED
       WHEN: TEST (&& (|| (== $y $MAX_Y) (== $y 0)) (< $x $MAX_X)) {
         ASSIGN $x (+ $x 1); // move to next x axis
         PERFORM MoveTo $x $y;
-        PERFORM CheckAndStore $x $y;
-        ASSIGN $velocity (* $velocity -1);
+        PERFORM CheckAndStore $x $y; // see if a rock is here
+        ASSIGN $velocity (* $velocity -1); // invert velocity
         UPDATE (EXPL_VELOCITY) (EXPL_VELOCITY $velocity);
       };
     };
   FAILURE:
+    // WHEN ROCK IS FOUND AND EXPLORATORY_MODE IS TURNED OFF
+    // NEED TO INVERT THE VELOCITY IF CURRENTLY ON X AXIS' FINAL POSITION
     WHEN: TEST (&& (== $y $MAX_Y) (== $velocity 1)){
       UPDATE (EXPL_VELOCITY) (EXPL_VELOCITY -1);
     };
@@ -103,7 +112,7 @@ Plan: {
 // FetchKnownRockRoutine
 Plan: {
   NAME:
-  	""
+  	"Fetch a known rock - routine"
   GOAL:
   	PERFORM FetchKnownRockRoutine;
   BODY:
@@ -119,13 +128,13 @@ Plan: {
 // MovedTo
 Plan: {
   NAME:
-  	""
+  	"Moved to"
   GOAL:
   	PERFORM MovedTo $X $Y $destName;
   BODY:
     RETRIEVE CURR_POS $x $y;
     AND
-    {
+    { // Approach destination on X axis
       ASSIGN $velocity 1;
       WHEN: TEST (< $X $x) {
         ASSIGN $velocity -1;
@@ -134,7 +143,7 @@ Plan: {
         ASSIGN $x (+ $x $velocity);
         PERFORM MoveTo $x $y;
       };
-    }{
+    }{  // Approach destination on Y axis
       ASSIGN $velocity 1;
       WHEN: TEST (< $Y $y) {
         ASSIGN $velocity -1;
@@ -148,19 +157,10 @@ Plan: {
     EXECUTE print "\nArrived " $destName;
 }
 
-// GetHomeRoutine
-Plan: {
-  NAME:
-  	""
-  GOAL:
-  	PERFORM GetHomeRoutine;
-  BODY:
-
-}
 // GetHomeExploring
 Plan: {
   NAME:
-  	""
+  	"Get Home Exploring"
   GOAL:
   	PERFORM GetHomeExploring $x $y;
   BODY:
@@ -169,13 +169,13 @@ Plan: {
       PERFORM MoveTo $x $y;
       PERFORM CheckAndRemember $x $y;
     };
-    UPDATE (EXPLOR_START_POS) (EXPLOR_START_POS $x $y);
+    UPDATE (EXPLOR_RES_POS) (EXPLOR_RES_POS $x $y);
 }
 
 // CheckAndStore
 Plan: {
   NAME:
-  	""
+  	"Check if a rock and store if watter is in it"
   GOAL:
   	PERFORM CheckAndStore $x $y;
   BODY:
@@ -189,7 +189,7 @@ Plan: {
         PERFORM GetHomeExploring $x $y;
       };
       UPDATE (MOVING_HOME_MODE) (MOVING_HOME_MODE "ON");
-      UPDATE (EXPLOR_START_POS) (EXPLOR_START_POS $x $y);
+      UPDATE (EXPLOR_RES_POS) (EXPLOR_RES_POS $x $y);
       UPDATE (EXPLORATORY_MODE) (EXPLORATORY_MODE "OFF");
     }{
       TEST (FACT ROCK $x $y "False");
@@ -201,10 +201,11 @@ Plan: {
       SUCCEED;
     };
 }
+
 // CheckAndRemember
 Plan: {
   NAME:
-  	""
+  	"Check if a rock and remember its position"
   GOAL:
   	PERFORM CheckAndRemember $x $y;
   BODY:
@@ -216,7 +217,7 @@ Plan: {
 // PrintStats
 Plan: {
   NAME:
-  	""
+  	"Print stats"
   GOAL:
   	PERFORM PrintStats ;
   BODY:
@@ -229,39 +230,10 @@ Plan: {
     EXECUTE print $water "\n";
 
 }
-// CheckIfRockAround
-Plan: {
-  NAME:
-  	""
-  GOAL:
-  	PERFORM CheckIfRockAround $rockIsFound $x $y;
-  BODY:
-    ASSIGN $i 0;
-    RETRIEVEALL $rocks ROCK $X $Y;
-
-    WHILE: TEST (< $i 5){
-      NEXTFACT $rocks ROCK $X $Y;
-      WHEN: TEST (&& (== $x $X) (== $y $Y)){
-        ASSIGN $rockIsFound "True";
-      };
-      ASSIGN $i (+ $i 1);
-    };
-}
-// AnalyzeRock
-Plan: {
-  NAME:
-  	""
-  GOAL:
-  	PERFORM AnalyzeRock;
-  BODY:
-    RETRIEVE initialized $foo;
-    EXECUTE print $foo "\n";
-    ASSIGN $foo (+ $foo "!!!");
-}
 // MoveTo X,Y
 Plan: {
   NAME:
-  	""
+  	"Move To"
   GOAL:
   	PERFORM MoveTo $x $y;
   BODY:
